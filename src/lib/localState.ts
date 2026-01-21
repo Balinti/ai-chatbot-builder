@@ -53,9 +53,13 @@ export interface LocalState {
   logs: SimulationLog[];
   meaningfulActionCompleted: boolean;
   hasSeenSavePrompt: boolean;
+  guestSessionStartedAt: string;
   createdAt: string;
   updatedAt: string;
 }
+
+// Minimum time (in milliseconds) a guest can use the app before being prompted to login
+export const GUEST_TRIAL_DURATION_MS = 3 * 60 * 1000; // 3 minutes
 
 const defaultPolicies: PolicyConfig[] = [
   {
@@ -139,14 +143,16 @@ const defaultPolicies: PolicyConfig[] = [
 ];
 
 function getDefaultState(): LocalState {
+  const now = new Date().toISOString();
   return {
     version: STORAGE_VERSION,
     policies: defaultPolicies,
     logs: [],
     meaningfulActionCompleted: false,
     hasSeenSavePrompt: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    guestSessionStartedAt: now,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -168,6 +174,12 @@ export function loadLocalState(): LocalState {
     // Handle version migration if needed
     if (parsed.version !== STORAGE_VERSION) {
       return migrateState(parsed);
+    }
+
+    // Ensure guestSessionStartedAt exists for older local storage entries
+    if (!parsed.guestSessionStartedAt) {
+      parsed.guestSessionStartedAt = parsed.createdAt || new Date().toISOString();
+      saveLocalState(parsed);
     }
 
     return parsed;
@@ -250,4 +262,10 @@ export function exportStateForSync(state: LocalState): Record<string, unknown> {
     logs: state.logs,
     createdAt: state.createdAt,
   };
+}
+
+export function hasGuestTrialExpired(state: LocalState): boolean {
+  const sessionStart = new Date(state.guestSessionStartedAt).getTime();
+  const now = Date.now();
+  return now - sessionStart >= GUEST_TRIAL_DURATION_MS;
 }

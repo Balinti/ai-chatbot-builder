@@ -12,6 +12,8 @@ import {
   addSimulationLog,
   markSavePromptSeen,
   exportStateForSync,
+  hasGuestTrialExpired,
+  GUEST_TRIAL_DURATION_MS,
   type LocalState,
   type PolicyConfig,
   type SimulationLog,
@@ -27,6 +29,7 @@ export default function AppPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'synced' | 'error'>('idle');
+  const [trialExpired, setTrialExpired] = useState(false);
 
   // Load state on mount
   useEffect(() => {
@@ -51,12 +54,48 @@ export default function AppPage() {
     };
   }, []);
 
-  // Show save prompt after first meaningful action (if not logged in)
+  // Check guest trial expiration periodically
+  useEffect(() => {
+    if (!state || user) return;
+
+    // Check immediately
+    if (hasGuestTrialExpired(state)) {
+      setTrialExpired(true);
+      return;
+    }
+
+    // Set up interval to check every 10 seconds
+    const interval = setInterval(() => {
+      if (hasGuestTrialExpired(state)) {
+        setTrialExpired(true);
+        clearInterval(interval);
+      }
+    }, 10000);
+
+    // Also set a timeout for the exact expiration time
+    const sessionStart = new Date(state.guestSessionStartedAt).getTime();
+    const timeUntilExpiry = GUEST_TRIAL_DURATION_MS - (Date.now() - sessionStart);
+
+    if (timeUntilExpiry > 0) {
+      const timeout = setTimeout(() => {
+        setTrialExpired(true);
+      }, timeUntilExpiry);
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+    }
+
+    return () => clearInterval(interval);
+  }, [state, user]);
+
+  // Show save prompt after trial expires AND meaningful action (if not logged in)
   useEffect(() => {
     if (
       state?.meaningfulActionCompleted &&
       !state?.hasSeenSavePrompt &&
-      !user
+      !user &&
+      trialExpired
     ) {
       // Delay showing the prompt a bit
       const timeout = setTimeout(() => {
@@ -64,7 +103,7 @@ export default function AppPage() {
       }, 1000);
       return () => clearTimeout(timeout);
     }
-  }, [state?.meaningfulActionCompleted, state?.hasSeenSavePrompt, user]);
+  }, [state?.meaningfulActionCompleted, state?.hasSeenSavePrompt, user, trialExpired]);
 
   const handleUpdatePolicy = useCallback(
     (type: PolicyConfig['type'], updates: Partial<PolicyConfig>) => {
