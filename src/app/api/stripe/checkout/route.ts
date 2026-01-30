@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createCheckoutSession, isStripeConfigured, PRICE_IDS } from '@/lib/stripe';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(request: NextRequest) {
   if (!isStripeConfigured()) {
@@ -36,24 +35,12 @@ export async function POST(request: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-    // Check if user already has a Stripe customer ID (only if Supabase is configured)
-    let existingCustomerId: string | undefined;
-    if (supabaseAdmin) {
-      const { data: subscription } = await supabaseAdmin
-        .from('subscriptions')
-        .select('stripe_customer_id')
-        .eq('user_id', userId)
-        .single();
-      existingCustomerId = subscription?.stripe_customer_id || undefined;
-    }
-
     const session = await createCheckoutSession({
       userId,
       email,
       priceId,
       successUrl: `${appUrl}/billing?success=true`,
       cancelUrl: `${appUrl}/billing?canceled=true`,
-      customerId: existingCustomerId,
     });
 
     if (!session) {

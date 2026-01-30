@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import GoogleAuth from './GoogleAuth';
+import AuthButton from './AuthButton';
 
 export default function Header() {
   const pathname = usePathname();
@@ -39,7 +39,7 @@ export default function Header() {
                 Integrations
               </Link>
             </nav>
-            <GoogleAuth />
+            <AuthButton />
           </div>
         </div>
       </header>
@@ -87,7 +87,7 @@ export default function Header() {
             </Link>
           </nav>
         </div>
-        <GoogleAuth />
+        <AuthButton />
       </div>
     </header>
   );

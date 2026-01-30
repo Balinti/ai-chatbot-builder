@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPortalSession, isStripeConfigured } from '@/lib/stripe';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(request: NextRequest) {
   if (!isStripeConfigured()) {
@@ -10,42 +9,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!supabaseAdmin) {
-    return NextResponse.json(
-      { error: 'Database is not configured' },
-      { status: 503 }
-    );
-  }
-
   try {
     const body = await request.json();
-    const { userId } = body as { userId: string };
+    const { customerId } = body as { customerId?: string };
 
-    if (!userId) {
+    if (!customerId) {
       return NextResponse.json(
-        { error: 'Missing required field: userId' },
+        { error: 'Missing required field: customerId' },
         { status: 400 }
-      );
-    }
-
-    // Get user's Stripe customer ID
-    const { data: subscription } = await supabaseAdmin
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('user_id', userId)
-      .single();
-
-    if (!subscription?.stripe_customer_id) {
-      return NextResponse.json(
-        { error: 'No subscription found for this user' },
-        { status: 404 }
       );
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     const session = await createPortalSession({
-      customerId: subscription.stripe_customer_id,
+      customerId,
       returnUrl: `${appUrl}/billing`,
     });
 
